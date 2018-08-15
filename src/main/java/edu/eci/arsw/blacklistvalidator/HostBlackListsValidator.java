@@ -17,54 +17,74 @@ import java.util.logging.Logger;
  */
 public class HostBlackListsValidator {
 
-    private static final int BLACK_LIST_ALARM_COUNT=5;
-    
+    public static final int BLACK_LIST_ALARM_COUNT = 5;
+
     /**
-     * Check the given host's IP address in all the available black lists,
-     * and report it as NOT Trustworthy when such IP was reported in at least
-     * BLACK_LIST_ALARM_COUNT lists, or as Trustworthy in any other case.
-     * The search is not exhaustive: When the number of occurrences is equal to
-     * BLACK_LIST_ALARM_COUNT, the search is finished, the host reported as
-     * NOT Trustworthy, and the list of the five blacklists returned.
+     * Check the given host's IP address in all the available black lists, and
+     * report it as NOT Trustworthy when such IP was reported in at least
+     * BLACK_LIST_ALARM_COUNT lists, or as Trustworthy in any other case. The
+     * search is not exhaustive: When the number of occurrences is equal to
+     * BLACK_LIST_ALARM_COUNT, the search is finished, the host reported as NOT
+     * Trustworthy, and the list of the five blacklists returned.
+     *
      * @param ipaddress suspicious host's IP address.
-     * @return  Blacklists numbers where the given host's IP address was found.
+     * @param numThreads number of threads.
+     * @return Blacklists numbers where the given host's IP address was found.
      */
-    public List<Integer> checkHost(String ipaddress){
-        
-        LinkedList<Integer> blackListOcurrences=new LinkedList<>();
-        
-        int ocurrencesCount=0;
-        
-        HostBlacklistsDataSourceFacade skds=HostBlacklistsDataSourceFacade.getInstance();
-        
-        int checkedListsCount=0;
-        
-        for (int i=0;i<skds.getRegisteredServersCount() && ocurrencesCount<BLACK_LIST_ALARM_COUNT;i++){
-            checkedListsCount++;
-            
-            if (skds.isInBlackListServer(i, ipaddress)){
-                
-                blackListOcurrences.add(i);
-                
-                ocurrencesCount++;
+    public List<Integer> checkHost(String ipaddress, int numThreads) throws InterruptedException {
+
+        LinkedList<Integer> blackListOcurrences = new LinkedList<>();
+        LinkedList<SearchThread> threadList = new LinkedList<>();
+
+        int ocurrencesCount = 0;
+        int checkedListsCount = 0;
+
+        HostBlacklistsDataSourceFacade skds = HostBlacklistsDataSourceFacade.getInstance();
+
+        int numServers = skds.getRegisteredServersCount();
+        int div = numServers / numThreads;
+        int mod = numServers % numThreads;
+        int minRange = 0;
+        int maxRange = minRange + div;
+        int var = maxRange + mod;
+
+        while (var <= numServers) {
+            System.out.println("#######" + minRange + "---###---" + maxRange + "----####----" + var);
+            if (var == numServers) {
+                threadList.add(new SearchThread(minRange, var, ipaddress));
+            } else {
+                threadList.add(new SearchThread(minRange, maxRange, ipaddress));
             }
+            minRange = maxRange;
+            maxRange = minRange + div;
+            var = maxRange + mod;
+        }
+
+        for (SearchThread i : threadList) {
+            i.start();
         }
         
-        if (ocurrencesCount>=BLACK_LIST_ALARM_COUNT){
+        for (SearchThread j : threadList) {
+            j.join();
+        }
+        
+        for (SearchThread k : threadList) {
+            blackListOcurrences.addAll(k.getBlackListOcurrences());
+            ocurrencesCount+=k.getOcurrences();
+            checkedListsCount+=k.getCheckedListsCount();
+        }
+
+        if (ocurrencesCount >= BLACK_LIST_ALARM_COUNT) {
             skds.reportAsNotTrustworthy(ipaddress);
-        }
-        else{
+        } else {
             skds.reportAsTrustworthy(ipaddress);
-        }                
-        
+        }
+
         LOG.log(Level.INFO, "Checked Black Lists:{0} of {1}", new Object[]{checkedListsCount, skds.getRegisteredServersCount()});
-        
+
         return blackListOcurrences;
     }
-    
-    
+
     private static final Logger LOG = Logger.getLogger(HostBlackListsValidator.class.getName());
-    
-    
-    
+
 }
