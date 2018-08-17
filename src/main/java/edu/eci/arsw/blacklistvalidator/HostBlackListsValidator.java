@@ -49,7 +49,6 @@ public class HostBlackListsValidator {
         int var = maxRange + mod;
 
         while (var <= numServers) {
-            System.out.println("#######" + minRange + "---###---" + maxRange + "----####----" + var);
             if (var == numServers) {
                 threadList.add(new SearchThread(minRange, var, ipaddress));
             } else {

@@ -10,7 +10,7 @@ import java.util.LinkedList;
 
 /**
  *
- * @author laboratorio
+ * @author Jonathan Prieto
  */
 public class SearchThread extends Thread {
 
